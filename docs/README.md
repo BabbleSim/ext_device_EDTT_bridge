@@ -21,7 +21,8 @@ It does the following:
            simulation time too)
 
 * It handles the wait requests from the EDTT driver by letting the simulation
-  advance by that amount of time
+  advance by that amount of time and replying with a dummy byte (with a value of 0)
+  when the wait has completed
 
 Effectively it either blocks the simulator or the EDTTool so that only one
 executes at a time, locksteping them to ensure that simulations are fully
