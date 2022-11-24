@@ -82,7 +82,7 @@ int receive_and_process_command_from_edtt(){
    *    1 byte : reception done (0) or timeout (1)
    *    8 bytes: timestamp when the reception or timeout actually happened
    *    0/N bytes: (0 bytes if timeout, N bytes as requested otherwise)
-   *  to a WAIT: nothing
+   *  to a WAIT: 1 byte (0) when wait is done
    *  to a DISCONNECT: nothing
    */
 #define DISCONNECT 0
@@ -117,6 +117,8 @@ int receive_and_process_command_from_edtt(){
       } else {
         bs_trace_warning_manual_time_line(Now,"Wait into the past (%"PRItime") ignored\n", wait_s.end);
       }
+      uint8_t reply = 0;
+      edtt_write(&reply, 1);
       break;
     }
     case SEND:
