@@ -19,6 +19,10 @@ It does the following:
          * The time in which the read has been actually finalized (or timeout
            occurred) is sent back to the EDTT (the EDTT driver knows the
            simulation time too)
+    * Receive with wait notify requests:
+
+         * Same as normal receive requests, except that whenever the bridge waits it
+           will first notify the EDTT bridge via a wait notification message
 
 * It handles the wait requests from the EDTT driver by letting the simulation
   advance by that amount of time and replying with a dummy byte (with a value of 0)

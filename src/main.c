@@ -28,6 +28,9 @@
  *    * The time in which the read has been actually finalized (or timeout
  *      occurred) is sent back to the EDTT (the EDTT driver knows the
  *      simulation time too)
+ *  * Receive with wait notify requests:
+ *    * Same as normal receive requests, except that whenever the bridge waits it
+ *      will first notify the EDTT bridge via a wait notification message
  * * It handles the wait requests from the EDTT driver by letting the simulation
  *   advance by that amount of time
  *
@@ -63,12 +66,16 @@ int receive_and_process_command_from_edtt(){
   /*
    * The protocol with the EDTTool is as follows:
    *  1 byte commands are sent from the EDTTool
-   *  The commands are: SEND, RCV, WAIT, DISCONNECT
+   *  The commands are: SEND, RCV, RCV_WAIT_NOTIFY, WAIT, DISCONNECT
    *  SEND is followed by:
    *    1 byte : device idx
    *    2 bytes: (uint16_t) number of bytes
    *    N bytes: payload to forward
    *  RCV is followed by:
+   *    1 byte : device idx
+   *    8 bytes: timeout time (simulated absolute time)
+   *    2 bytes: (uint16_t) number of bytes
+   *  RCV_WAIT_NOTIFY is followed by:
    *    1 byte : device idx
    *    8 bytes: timeout time (simulated absolute time)
    *    2 bytes: (uint16_t) number of bytes
@@ -82,13 +89,24 @@ int receive_and_process_command_from_edtt(){
    *    1 byte : reception done (0) or timeout (1)
    *    8 bytes: timestamp when the reception or timeout actually happened
    *    0/N bytes: (0 bytes if timeout, N bytes as requested otherwise)
+   *  to a RCV_WAIT_NOTIFY:
+   *    0 or more WAIT_NOTIFICATION followed by:
+   *      8 bytes: (uint64_t) absolute time stamp until which the wait will run (not the wait duration, but the end of the wait)
+   *    After the receive is complete (or timed out):
+   *      1 byte : reception done (0) or timeout (1)
+   *      8 bytes: timestamp when the reception or timeout actually happened
+   *      0/N bytes: (0 bytes if timeout, N bytes as requested otherwise)
    *  to a WAIT: 1 byte (0) when wait is done
    *  to a DISCONNECT: nothing
+   *
    */
 #define DISCONNECT 0
 #define WAIT 1
 #define SEND 2
 #define RCV  3
+#define RCV_WAIT_NOTIFY 4
+
+#define WAIT_NOTIFICATION 0xF0
 
   uint8_t command = DISCONNECT;
 
@@ -136,6 +154,7 @@ int receive_and_process_command_from_edtt(){
       break;
     }
     case RCV:
+    case RCV_WAIT_NOTIFY:
     {
       uint8_t device_idx;
       uint16_t number_of_bytes = 0;
@@ -156,6 +175,12 @@ int receive_and_process_command_from_edtt(){
           //we wait for a small amount of time to let the device produce more
           pb_wait_t Wait_struct;
           Wait_struct.end = Now + read_wait_time;
+          if (command == RCV_WAIT_NOTIFY) {
+            uint8_t notify_buffer[sizeof(bs_time_t) + 1];
+            notify_buffer[0] = WAIT_NOTIFICATION;
+            memcpy(&notify_buffer[1], &Wait_struct.end, sizeof(Wait_struct.end));
+            edtt_write(notify_buffer, sizeof(notify_buffer));
+          }
           if ( pb_dev_request_wait_block(&state, &Wait_struct) != 0 ) {
             bs_trace_exit_line("Disconnected by Phy during wait\n");
           }
