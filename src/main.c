@@ -79,7 +79,7 @@ int receive_and_process_command_from_edtt(){
    *    1 byte : device idx
    *    8 bytes: timeout time (simulated absolute time)
    *    2 bytes: (uint16_t) number of bytes
-   *  WAIT:
+   *  WAIT & WAIT_WRESP:
    *    8 bytes: (uint64_t) absolute time stamp until which to wait (not the wait duration, but the end of the wait)
    *  DISCONNECT: nothing
    *
@@ -96,12 +96,16 @@ int receive_and_process_command_from_edtt(){
    *      1 byte : reception done (0) or timeout (1)
    *      8 bytes: timestamp when the reception or timeout actually happened
    *      0/N bytes: (0 bytes if timeout, N bytes as requested otherwise)
-   *  to a WAIT: 1 byte (0) when wait is done
+   *  to a WAIT: nothing
+   *  to a WAIT_WRESP:
+   *      1 byte (0) when wait is done
    *  to a DISCONNECT: nothing
+   *  to an unknown command: UNKNOWN_COMMAND
    *
    */
 #define DISCONNECT 0
 #define WAIT 1
+#define WAIT_WRESP 5
 #define SEND 2
 #define RCV  3
 #define RCV_WAIT_NOTIFY 4
@@ -124,6 +128,7 @@ int receive_and_process_command_from_edtt(){
       break;
     }
     case WAIT:
+    case WAIT_WRESP:
     { //Let the simulator run until this time is reached
       pb_wait_t wait_s; //64bits = 8bytes
       edtt_read((uint8_t*)&wait_s.end, sizeof(wait_s.end));
@@ -136,8 +141,10 @@ int receive_and_process_command_from_edtt(){
       } else {
         bs_trace_warning_manual_time_line(Now,"Wait into the past (%"PRItime") ignored\n", wait_s.end);
       }
-      uint8_t reply = 0;
-      edtt_write(&reply, 1);
+      if (command == WAIT_WRESP) {
+        uint8_t reply = 0;
+        edtt_write(&reply, 1);
+      }
       break;
     }
     case SEND:
