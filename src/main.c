@@ -107,6 +107,7 @@ int receive_and_process_command_from_edtt(){
 #define RCV_WAIT_NOTIFY 4
 
 #define WAIT_NOTIFICATION 0xF0
+#define UNKNOWN_COMMAND 0xFF
 
   uint8_t command = DISCONNECT;
 
@@ -205,8 +206,14 @@ int receive_and_process_command_from_edtt(){
       break;
     }
     default:
-      bs_trace_error_line("Can't understand command %u\n", command);
+    {
+      uint8_t reply = UNKNOWN_COMMAND;
+      edtt_write(&reply, sizeof(reply)); //Before dying, let's tell the EDTT of the incompatibility
+      bs_trace_error_line("Can't understand command %u;"
+                          "Most likely the EDTT version you are using requires a newer bridge\n",
+                          command);
       break;
+    }
   }
 
   return 0;
